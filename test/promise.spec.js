@@ -20,6 +20,10 @@ describe('Promise', () => {
                 done();
             });
         });
+        it('ignores reject if resolve has been called');
+        it('ignores reject if reject has already been called');
+        it('ignores resolve if reject has been called');
+        it('ignores resolve if resolve has already been called');
     });
 
     describe('#then', () => {
