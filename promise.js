@@ -1,7 +1,6 @@
 /**
  * @class Custom Promise implementation.
- *
- * This implementation should pass tests in promise.spec.js.
+ * @todo Make this pass tests in `tests/promise.spec.js`.
  */
 class Promise {
 
