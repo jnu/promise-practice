@@ -21,51 +21,80 @@ class Promise {
      * @param {(resolve: (val: any) => void, reject: (reason: any) => void) => void} executor
      */
     constructor(executor) {
-        /** TODO Implement */
 
-
-
-        //////// REMOVE
+        /**
+         * Current state of Promise: pending, rejected, resolved
+         * @type {String}
+         */
         this._state = 'pending';
+        /**
+         * Value of resolved promise
+         * @type {any?}
+         */
+        this._value = undefined;
+        /**
+         * Reason for rejected promise
+         * @type {any?}
+         */
+        this._reason = undefined;
+        /**
+         * Wrapper to handle rejection (@see Promise#then and Promise#catch)
+         * @type {Function?}
+         */
+        this._onRejected = null;
+        /**
+         * Wrapper to handle resolve (@see Promise#then)
+         * @type {Function?}
+         */
+        this._onResolved = null;
 
+        // Executor's resolve
         const resolve = value => {
+            if (this._state !== 'pending') {
+                return;
+            }
             this._value = value;
             this._state = 'resolved';
             this._fulfill();
         }
 
+        // Executor's reject
         const reject = reason => {
+            if (this._state !== 'pending') {
+                return;
+            }
             this._reason = reason;
             this._state = 'rejected';
             this._fulfill();
         }
 
+        // Catch unhandled errors and implicitly reject
         try {
             executor(resolve, reject);
         } catch (e) {
             reject(e);
         }
-        //////// REMOVE
-
-
-
 
     }
 
 
-
-
-
-
-    ///////// REMOVE
+    /**
+     * Convenience helper to invoke resolve or reject actions based on state
+     * @private
+     */
     _fulfill() {
-        if (this._state === 'resolved') {
+        const state = this._state;
+        if (state === 'resolved') {
             this._doResolve();
-        } else if (this._state === 'rejected') {
+        } else if (state === 'rejected') {
             this._doReject();
         }
     }
 
+    /**
+     * Invoke and clear the resolved handler.
+     * @private
+     */
     _doResolve() {
         let fn = this._onResolved;
         if (fn) {
@@ -74,6 +103,10 @@ class Promise {
         }
     }
 
+    /**
+     * Invoke and clear the rejected handler
+     * @private
+     */
     _doReject() {
         let fn = this._onRejected;
         if (fn) {
@@ -81,11 +114,48 @@ class Promise {
             fn(this._reason);
         }
     }
-    ///////// REMOVE
 
+    /**
+     * Set the handler to invoke when a promise is resolved. That function is
+     * a wrapper around the callback given in the #then method and the
+     * executor resolve and reject callbacks from the Promise returned by
+     * that method.
+     *
+     * If `onResolve` is falsy, the handler is unset.
+     *
+     * @private
+     * @param {Function?} onResolve - callback provided to #then
+     * @param {Function?} resolve - resolve callback from #then's Promise
+     * @param {Function?} reject - reject callback from #then's Promise
+     */
+    _setResolvedHandler(onResolve, resolve, reject) {
+        this._onResolved = onResolve ? value => {
+            Promise.resolve(onResolve(value))
+                .then(resolve)
+                .catch(reject);
+        } : null;
+    }
 
-
-
+    /**
+     * Set up a handler to invoke when a promise is rejected. That function is
+     * a wrapper around the callback given in the #then or #catch methods and
+     * the executor's resolve and reject callbacks from the Promises that those
+     * methods return.
+     *
+     * If `onReject` is falsy, the handler is unset.
+     *
+     * @private
+     * @param {Function?} onReject - callback provided to #then or #catch
+     * @param {Function?} resolve - resolve callback from method's Promise
+     * @param {Function?} reject - reject callback from method's Promise
+     */
+    _setRejectedHandler(onReject, resolve, reject) {
+        this._onRejected = onReject ? reason => {
+            Promise.resolve(onReject(reason))
+                .then(resolve)
+                .catch(reject)
+        } : null;
+    }
 
     /**
      * Register callbacks for when `resolve` or `reject` are called. Both
@@ -96,27 +166,20 @@ class Promise {
      * @return {Promise}
      */
     then(onResolve, onReject) {
-        /** TODO Implement */
+        if (!onResolve && !onReject) {
+            throw new Error('Promise#then must have at least one handler');
+        }
 
-
-
-        ///////// REMOVE
-        this._onResolved = null;
-        this._onRejected = null;
-
+        // Return a promise that calls given handlers when it resolves/rejects
         return new Promise((resolve, reject) => {
-            this._onResolved = onResolve ? () => {
-                Promise.resolve(onResolve(this._value)).then(resolve);
-            } : null;
+            // Set up handlers on `this` (the host Promise).
+            this._setResolvedHandler(onResolve, resolve, reject);
+            this._setRejectedHandler(onReject, resolve, reject);
 
-            this._onRejected = onReject ? () => {
-                Promise.resolve(onReject(this._reason)).then(reject);
-            } : null;
-
-            this._fulfill();
+            // Optimistically try to fulfill this Promise, in case `this` is
+            // already in `pending` state.
+            setTimeout(() => this._fulfill(), 0);
         });
-        ///////// REMOVE
-
     }
 
     /**
@@ -125,25 +188,11 @@ class Promise {
      * @return {Promise}
      */
     catch(onReject) {
-        /** TODO Implement */
-
-
-
-
-        ///////// REMOVE
         this._onRejected = null;
         return new Promise((resolve, reject) => {
-            this._onRejected = () => {
-                resolve(Promise.resolve(onReject(this._reason)));
-            };
-
+            this._setRejectedHandler(onReject, resolve, reject)
             this._fulfill();
         });
-        ///////// REMOVE
-
-
-
-
     }
 
     /**
@@ -167,20 +216,12 @@ class Promise {
  * @return {Promise}
  */
 Promise.resolve = function resolve(value) {
-    /** TODO Implement */
-
-
-
-    //////// REMOVE
     if (value instanceof Promise) {
         return value;
     }
     return new Promise(resolve => {
         setTimeout(() => resolve(value), 0);
     });
-    //////// REMOVE
-
-
 };
 
 /**
@@ -190,7 +231,9 @@ Promise.resolve = function resolve(value) {
  * @return {Promise}
  */
 Promise.reject = function reject(reason) {
-    /** TODO Implement */
+    return new Promise((resolve, reject) => {
+        setTimeout(() => reject(reason), 0);
+    });
 };
 
 /**
@@ -207,7 +250,31 @@ Promise.reject = function reject(reason) {
  * @return {Promise} - resolves with array corresponding to input promises
  */
 Promise.all = function all(iterable) {
-    /** TODO Implement */
+    return new Promise((resolve, reject) => {
+        let count = 0;
+        let len = iterable.length;
+        let vals = new Array(len);
+
+        // Resolve a single promise. The final call will also resolve all.
+        const resolveOne = (id, val) => {
+            vals[id] = val;
+            if (++count === len) {
+                resolve();
+            }
+        }
+
+        // Special case: empty array, resolve immediately.
+        if (!len) {
+            resolve();
+            return;
+        }
+
+        iterable.forEach(p => Promise
+            .resolve(p)
+            .then(resolveOne)
+            .catch(reject)
+        );
+    });
 };
 
 /**
@@ -219,7 +286,22 @@ Promise.all = function all(iterable) {
  * @return {Promise}
  */
 Promise.race = function race(iterable) {
-    /** TODO Implement */
+    return new Promise((resolve, reject) => {
+        // Special case: empty array.
+        if (!len) {
+            resolve();
+            return;
+        }
+
+        // Ensure all promises and hook them into the resolve, reject handler.
+        // It doesn't really make sense to pass non-promises here, since they
+        // will always win the race, but whatever.
+        iterable.forEach(p => Promise
+            .resolve(p)
+            .then(resolve)
+            .catch(reject)
+        );
+    });
 };
 
 
