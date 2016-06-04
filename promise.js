@@ -44,8 +44,8 @@ class Promise {
     }
 
     /**
-     * Execute a function regardless of whether the Promise resolved or rejected.
-     * Do not change its return value.
+     * Execute a function regardless of whether the Promise resolved or
+     * rejected, but do not handle errors or change promise value.
      *
      * Angular's $q implements this and it is sometimes useful. It is not in
      * the actual ES2015 spec.
@@ -104,7 +104,7 @@ Promise.all = function all(iterable) {
  */
 Promise.race = function race(iterable) {
     /** TODO Implement */
-}
+};
 
 
 export default Promise;
