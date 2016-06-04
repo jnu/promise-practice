@@ -22,7 +22,70 @@ class Promise {
      */
     constructor(executor) {
         /** TODO Implement */
+
+
+
+        //////// REMOVE
+        this._state = 'pending';
+
+        const resolve = value => {
+            this._value = value;
+            this._state = 'resolved';
+            this._fulfill();
+        }
+
+        const reject = reason => {
+            this._reason = reason;
+            this._state = 'rejected';
+            this._fulfill();
+        }
+
+        try {
+            executor(resolve, reject);
+        } catch (e) {
+            reject(e);
+        }
+        //////// REMOVE
+
+
+
+
     }
+
+
+
+
+
+
+    ///////// REMOVE
+    _fulfill() {
+        if (this._state === 'resolved') {
+            this._doResolve();
+        } else if (this._state === 'rejected') {
+            this._doReject();
+        }
+    }
+
+    _doResolve() {
+        let fn = this._onResolved;
+        if (fn) {
+            this._onResolved = null;
+            fn(this._value);
+        }
+    }
+
+    _doReject() {
+        let fn = this._onRejected;
+        if (fn) {
+            this._onRejected = null;
+            fn(this._reason);
+        }
+    }
+    ///////// REMOVE
+
+
+
+
 
     /**
      * Register callbacks for when `resolve` or `reject` are called. Both
@@ -34,6 +97,26 @@ class Promise {
      */
     then(onResolve, onReject) {
         /** TODO Implement */
+
+
+
+        ///////// REMOVE
+        this._onResolved = null;
+        this._onRejected = null;
+
+        return new Promise((resolve, reject) => {
+            this._onResolved = onResolve ? () => {
+                Promise.resolve(onResolve(this._value)).then(resolve);
+            } : null;
+
+            this._onRejected = onReject ? () => {
+                Promise.resolve(onReject(this._reason)).then(reject);
+            } : null;
+
+            this._fulfill();
+        });
+        ///////// REMOVE
+
     }
 
     /**
@@ -43,6 +126,24 @@ class Promise {
      */
     catch(onReject) {
         /** TODO Implement */
+
+
+
+
+        ///////// REMOVE
+        this._onRejected = null;
+        return new Promise((resolve, reject) => {
+            this._onRejected = () => {
+                resolve(Promise.resolve(onReject(this._reason)));
+            };
+
+            this._fulfill();
+        });
+        ///////// REMOVE
+
+
+
+
     }
 
     /**
@@ -67,6 +168,19 @@ class Promise {
  */
 Promise.resolve = function resolve(value) {
     /** TODO Implement */
+
+
+
+    //////// REMOVE
+    if (value instanceof Promise) {
+        return value;
+    }
+    return new Promise(resolve => {
+        setTimeout(() => resolve(value), 0);
+    });
+    //////// REMOVE
+
+
 };
 
 /**
