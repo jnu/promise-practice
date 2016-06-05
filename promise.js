@@ -43,10 +43,10 @@ class Promise {
          */
         this._onRejected = null;
         /**
-         * Wrapper to handle resolve (@see Promise#then)
-         * @type {Function?}
+         * Queue for resolve handlers (@see Promise#then)
+         * @type {Array<Function>}
          */
-        this._onResolved = null;
+        this._onResolved = [];
 
         // Executor's resolve
         const resolve = value => {
@@ -74,7 +74,6 @@ class Promise {
         } catch (e) {
             reject(e);
         }
-
     }
 
 
@@ -96,10 +95,11 @@ class Promise {
      * @private
      */
     _doResolve() {
-        let fn = this._onResolved;
-        if (fn) {
-            this._onResolved = null;
-            fn(this._value);
+        let queue = this._onResolved;
+        let value = this._value;
+        while (queue.length) {
+            let cb = queue.shift();
+            setTimeout(() => cb(value));
         }
     }
 
@@ -110,8 +110,9 @@ class Promise {
     _doReject() {
         let fn = this._onRejected;
         if (fn) {
+            let reason = this._reason;
             this._onRejected = null;
-            fn(this._reason);
+            setTimeout(() => fn(reason));
         }
     }
 
@@ -129,11 +130,13 @@ class Promise {
      * @param {Function?} reject - reject callback from #then's Promise
      */
     _setResolvedHandler(onResolve, resolve, reject) {
-        this._onResolved = onResolve ? value => {
-            Promise.resolve(onResolve(value))
+        if (onResolve) {
+            this._onResolved.push(value => Promise
+                .resolve(onResolve(value))
                 .then(resolve)
-                .catch(reject);
-        } : null;
+                .catch(reject)
+            );
+        }
     }
 
     /**
@@ -150,11 +153,12 @@ class Promise {
      * @param {Function?} reject - reject callback from method's Promise
      */
     _setRejectedHandler(onReject, resolve, reject) {
-        this._onRejected = onReject ? reason => {
-            Promise.resolve(onReject(reason))
+        this._onRejected = onReject ?
+            reason => Promise
+                .resolve(onReject(reason))
                 .then(resolve)
-                .catch(reject)
-        } : null;
+                .catch(reject) :
+            null;
     }
 
     /**
