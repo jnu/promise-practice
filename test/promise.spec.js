@@ -20,10 +20,64 @@ describe('Promise', () => {
                 done();
             });
         });
-        it('ignores reject if resolve has been called');
-        it('ignores reject if reject has already been called');
-        it('ignores resolve if reject has been called');
-        it('ignores resolve if resolve has already been called');
+        it('ignores reject if resolve has been called', done => {
+            let p = new Promise((resolve, reject) => {
+                setTimeout(resolve, 5);
+                setTimeout(reject, 10);
+            });
+
+            p.then(() => {
+                setTimeout(done, 10);
+            });
+            p.catch(() => {
+                done('unexpected reject');
+            });
+        });
+        it('ignores reject if reject has already been called', done => {
+            let p = new Promise((resolve, reject) => {
+                setTimeout(reject, 5);
+                setTimeout(reject, 10);
+            });
+
+            let count = 0;
+            p.then(() => done('unexpected resolve'))
+            p.catch(() => {
+                count++;
+            });
+            setTimeout(() => {
+                chai.expect(count).to.equal(1);
+                done();
+            }, 15);
+        });
+        it('ignores resolve if reject has been called', done => {
+            let p = new Promise((resolve, reject) => {
+                setTimeout(resolve, 10);
+                setTimeout(reject, 5);
+            });
+
+            p.then(() => {
+                done('unexpected resolve');
+            });
+            p.catch(() => {
+                setTimeout(done, 10);
+            });
+        });
+        it('ignores resolve if resolve has already been called', done => {
+            let p = new Promise((resolve, reject) => {
+                setTimeout(resolve, 5);
+                setTimeout(resolve, 10);
+            });
+
+            let count = 0;
+            p.catch(() => done('unexpected reject'))
+            p.then(() => {
+                count++;
+            });
+            setTimeout(() => {
+                chai.expect(count).to.equal(1);
+                done();
+            }, 15);
+        });
     });
 
     describe('#then', () => {
@@ -74,9 +128,59 @@ describe('Promise', () => {
                     done();
                 });
         });
-        it('defers `onResolved` even when Promise resolves immediately');
-        it('defers `onRejected` (when present) even when Promise rejects immediately');
-        it('does not affect the initial Promise state (can be #thenned forever with the same result)');
+        it('defers `onResolved` even when Promise resolves immediately', done => {
+            let value = 0;
+            let p = new Promise(resolve => {
+                resolve(1);
+            });
+            p.then(val => {
+                value = val;
+                done();
+            });
+            p.catch(() => done('unexpected reject'));
+            chai.expect(value).to.equal(0);
+        });
+        it('defers `onRejected` (when present) even when Promise rejects immediately', done => {
+            let value = 0;
+            let p = new Promise((resolve, reject) => {
+                reject(1);
+            });
+            p.then(() => done('unexpected resolve'))
+            p.catch(reason => {
+                value = reason;
+                done();
+            });
+            chai.expect(value).to.equal(0);
+        });
+        it('can be thenned multiple times while pending', done => {
+            let string = '';
+            let p = new Promise(resolve => setTimeout(resolve, 5));
+            p.then(() => string += 'a');
+            p.then(() => string += 'b');
+            p.then(() => string += 'c');
+            setTimeout(() => {
+                chai.expect(string).to.equal('abc');
+                done();
+            }, 10);
+        });
+        it('can be thenned multiple times after resolved', done => {
+            let string = '';
+            let p = new Promise(resolve => setTimeout(resolve, 0));
+            p.then(() => string += 'a');
+            p.catch(() => done('unexpected reject'));
+            setTimeout(() => {
+                p.then(() => string += 'b');
+            }, 5);
+            setTimeout(() => {
+                p.then(() => string += 'c');
+                p.then(() => string += 'd');
+            }, 10);
+            setTimeout(() => {
+                chai.expect(string).to.equal('abcd');
+                done();
+            }, 15);
+        });
+        it('does not handle error if no onRejected is passed');
         it('need not be called with `onResolved` if `onRejected` is passed');
         it('need not specifiy `onRejected` if `onResolved` is passed');
         it('may not be called with no handlers');
