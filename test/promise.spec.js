@@ -5,7 +5,7 @@
  * Note test run times for each implementation. (es6-promise is comparable to
  * the native implementation.)
  */
-// import Promise from '../promise';
+import Promise from '../promise';
 // import { Promise } from 'es6-promise';
 ////////////////////////////////////////////////////////////////////////////////
 import * as chai from 'chai';
