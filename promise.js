@@ -38,10 +38,10 @@ class Promise {
          */
         this._reason = undefined;
         /**
-         * Wrapper to handle rejection (@see Promise#then and Promise#catch)
-         * @type {Function?}
+         * Queue for reject handlers (@see Promise#then and Promise#catch)
+         * @type {Array<Function>}
          */
-        this._onRejected = null;
+        this._onRejected = [];
         /**
          * Queue for resolve handlers (@see Promise#then)
          * @type {Array<Function>}
@@ -76,7 +76,6 @@ class Promise {
         }
     }
 
-
     /**
      * Convenience helper to invoke resolve or reject actions based on state
      * @private
@@ -99,7 +98,7 @@ class Promise {
         let value = this._value;
         while (queue.length) {
             let cb = queue.shift();
-            setTimeout(() => cb(value));
+            cb(value);
         }
     }
 
@@ -108,11 +107,11 @@ class Promise {
      * @private
      */
     _doReject() {
-        let fn = this._onRejected;
-        if (fn) {
-            let reason = this._reason;
-            this._onRejected = null;
-            setTimeout(() => fn(reason));
+        let queue = this._onRejected;
+        let reason = this._reason;
+        while (queue.length) {
+            let cb = queue.shift();
+            cb(reason);
         }
     }
 
@@ -126,17 +125,25 @@ class Promise {
      *
      * @private
      * @param {Function?} onResolve - callback provided to #then
-     * @param {Function?} resolve - resolve callback from #then's Promise
-     * @param {Function?} reject - reject callback from #then's Promise
+     * @param {Function} resolve - resolve callback from #then's Promise
+     * @param {Function} reject - reject callback from #then's Promise
      */
     _setResolvedHandler(onResolve, resolve, reject) {
-        if (onResolve) {
-            this._onResolved.push(value => Promise
-                .resolve(onResolve(value))
-                .then(resolve)
-                .catch(reject)
-            );
-        }
+        // Use identity handler by default
+        onResolve = onResolve || (v => v);
+
+        this._onResolved.push(value => setTimeout(() => {
+            try {
+                let nextValue = onResolve(value);
+                if (nextValue instanceof Promise) {
+                    nextValue.then(resolve);
+                } else {
+                    resolve(nextValue);
+                }
+            } catch (e) {
+                reject(e);
+            }
+        }, 0));
     }
 
     /**
@@ -149,16 +156,27 @@ class Promise {
      *
      * @private
      * @param {Function?} onReject - callback provided to #then or #catch
-     * @param {Function?} resolve - resolve callback from method's Promise
-     * @param {Function?} reject - reject callback from method's Promise
+     * @param {Function} resolve - resolve callback from method's Promise
+     * @param {Function} reject - reject callback from method's Promise
      */
     _setRejectedHandler(onReject, resolve, reject) {
-        this._onRejected = onReject ?
-            reason => Promise
-                .resolve(onReject(reason))
-                .then(resolve)
-                .catch(reject) :
-            null;
+        // If no onReject handler was passed, default to re-throwing
+        onReject = onReject || (reason => {
+            throw reason;
+        });
+
+        this._onRejected.push(reason => setTimeout(() => {
+            try {
+                let value = onReject(reason);
+                if (value instanceof Promise) {
+                    value.then(resolve);
+                } else {
+                    resolve(value);
+                }
+            } catch (e) {
+                reject(e);
+            }
+        }, 0));
     }
 
     /**
@@ -170,10 +188,6 @@ class Promise {
      * @return {Promise}
      */
     then(onResolve, onReject) {
-        if (!onResolve && !onReject) {
-            throw new Error('Promise#then must have at least one handler');
-        }
-
         // Return a promise that calls given handlers when it resolves/rejects
         return new Promise((resolve, reject) => {
             // Set up handlers on `this` (the host Promise).
@@ -182,7 +196,7 @@ class Promise {
 
             // Optimistically try to fulfill this Promise, in case `this` is
             // already in `pending` state.
-            setTimeout(() => this._fulfill(), 0);
+            this._fulfill();
         });
     }
 
@@ -192,9 +206,8 @@ class Promise {
      * @return {Promise}
      */
     catch(onReject) {
-        this._onRejected = null;
         return new Promise((resolve, reject) => {
-            this._setRejectedHandler(onReject, resolve, reject)
+            this._setRejectedHandler(onReject, resolve, reject);
             this._fulfill();
         });
     }
@@ -223,9 +236,7 @@ Promise.resolve = function resolve(value) {
     if (value instanceof Promise) {
         return value;
     }
-    return new Promise(resolve => {
-        setTimeout(() => resolve(value), 0);
-    });
+    return new Promise(resolve => resolve(value));
 };
 
 /**
@@ -235,9 +246,7 @@ Promise.resolve = function resolve(value) {
  * @return {Promise}
  */
 Promise.reject = function reject(reason) {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => reject(reason), 0);
-    });
+    return new Promise((resolve, reject) => reject(reason));
 };
 
 /**
@@ -263,20 +272,19 @@ Promise.all = function all(iterable) {
         const resolveOne = (id, val) => {
             vals[id] = val;
             if (++count === len) {
-                resolve();
+                resolve(vals);
             }
         }
 
         // Special case: empty array, resolve immediately.
         if (!len) {
-            resolve();
+            resolve([]);
             return;
         }
 
-        iterable.forEach(p => Promise
+        iterable.forEach((p, i) => Promise
             .resolve(p)
-            .then(resolveOne)
-            .catch(reject)
+            .then(v => resolveOne(i, v), reject)
         );
     });
 };
@@ -292,7 +300,7 @@ Promise.all = function all(iterable) {
 Promise.race = function race(iterable) {
     return new Promise((resolve, reject) => {
         // Special case: empty array.
-        if (!len) {
+        if (!iterable.length) {
             resolve();
             return;
         }
@@ -302,8 +310,7 @@ Promise.race = function race(iterable) {
         // will always win the race, but whatever.
         iterable.forEach(p => Promise
             .resolve(p)
-            .then(resolve)
-            .catch(reject)
+            .then(resolve, reject)
         );
     });
 };
