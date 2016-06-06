@@ -25,8 +25,10 @@ class Promise {
     }
 
     /**
-     * Register a callback when `resolve` is called
-     * @param  {(val: any) => any} callback
+     * Register callbacks for when `resolve` or `reject` are called. Both
+     * handlers are optional; if neither handler is passed, this is effectively
+     * a clone operation.
+     * @param  {(val: any) => any?} callback - optional resolve handler
      * @param  {(reason: any) => any?} errback - optional reject handler
      * @return {Promise}
      */
