@@ -4,7 +4,7 @@
   "description": "",
   "main": "promise.js",
   "scripts": {
-    "test": "mocha --compilers js:babel-register --ui tdd --colors",
+    "test": "mocha --compilers js:babel-register --ui tdd --colors --async-only --growl",
     "start": "watch-run -i -p './*.js,./test/*.js' npm test"
   },
   "author": "",
