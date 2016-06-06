@@ -27,6 +27,7 @@ class Promise {
     /**
      * Register a callback when `resolve` is called
      * @param  {(val: any) => any} callback
+     * @param  {(reason: any) => any?} errback - optional reject handler
      * @return {Promise}
      */
     then(onResolve, onReject) {
