@@ -1,3 +1,8 @@
+const PENDING = 'pending';
+const RESOLVED = 'resolved';
+const REJECTED = 'rejected';
+
+
 /**
  * @class Custom Promise implementation.
  * @todo Make this pass tests in `tests/promise.spec.js`.
@@ -21,7 +26,25 @@ class Promise {
      * @param {(resolve: (val: any) => void, reject: (reason: any) => void) => void} executor
      */
     constructor(executor) {
-        /** TODO Implement */
+
+        this._result = null;
+        this._queue = [];
+        this._state = PENDING;
+
+        const fulfill = (state, result) => {
+            if (this._state !== PENDING) {
+                return;
+            }
+
+            this._state = state;
+            this._result = result;
+            this._fulfill();
+        }
+
+        const resolve = fulfill.bind(this, RESOLVED);
+        const reject = fulfill.bind(this, REJECTED);
+
+        executor(resolve, reject);
     }
 
     /**
@@ -42,7 +65,7 @@ class Promise {
      * @return {Promise}
      */
     catch(onReject) {
-        /** TODO Implement */
+        return this.then(undefined, onReject);
     }
 
     /**
