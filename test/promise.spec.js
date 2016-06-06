@@ -1,4 +1,13 @@
-import Promise from '../promise';
+/**
+ * Compare against other Promise implementations:
+ *  - Comment out both imports to use native Promise
+ *  - Uncomment `es6-promise` to use 3rd party polyfill
+ * Note test run times for each implementation. (es6-promise is comparable to
+ * the native implementation.)
+ */
+// import Promise from '../promise';
+// import { Promise } from 'es6-promise';
+////////////////////////////////////////////////////////////////////////////////
 import * as chai from 'chai';
 
 describe('Promise', () => {
