@@ -2,6 +2,20 @@ const PENDING = 'pending';
 const RESOLVED = 'resolved';
 const REJECTED = 'rejected';
 
+const noop = () => {};
+const identity = v => v;
+const thrower = e => { throw e; };
+
+function makePromiseInState(state, v) {
+    let p = new Promise(noop);
+    p._result = v;
+    p._state = state;
+    return p;
+}
+
+function isPromise(p) {
+    return p instanceof Promise;
+}
 
 /**
  * @class Custom Promise implementation.
@@ -26,7 +40,6 @@ class Promise {
      * @param {(resolve: (val: any) => void, reject: (reason: any) => void) => void} executor
      */
     constructor(executor) {
-
         this._result = null;
         this._queue = [];
         this._state = PENDING;
@@ -38,13 +51,52 @@ class Promise {
 
             this._state = state;
             this._result = result;
-            this._fulfill();
+            this._publishResult();
         }
 
-        const resolve = fulfill.bind(this, RESOLVED);
-        const reject = fulfill.bind(this, REJECTED);
+        const resolve = v => fulfill(RESOLVED, v);
+        const reject = r => fulfill(REJECTED, r);
 
-        executor(resolve, reject);
+        try {
+            executor(resolve, reject);
+        } catch (e) {
+            reject(e);
+        }
+    }
+
+    _publishResult() {
+        setTimeout(() => this._invokeReactions(this._state), 0);
+    }
+
+    _invokeReactions(type) {
+        const queue = this._queue;
+        const result = this._result;
+        while (queue.length) {
+            let reactionRecord = queue.shift();
+            reactionRecord[type](result);
+        }
+    }
+
+    _addReactionRecord(resolvePredicate, rejectPredicate, thenResolve, thenReject) {
+        this._queue.push({
+            [RESOLVED]: this._createReaction(resolvePredicate, thenResolve, thenReject),
+            [REJECTED]: this._createReaction(rejectPredicate, thenResolve, thenReject)
+        });
+    }
+
+    _createReaction(predicate, onResolve, onReject) {
+        return result => {
+            try {
+                const value = predicate(result);
+                if (isPromise(value)) {
+                    value.then(onResolve, onReject);
+                } else {
+                    onResolve(value);
+                }
+            } catch (e) {
+                onReject(e);
+            }
+        };
     }
 
     /**
@@ -56,7 +108,17 @@ class Promise {
      * @return {Promise}
      */
     then(onResolve, onReject) {
-        /** TODO Implement */
+        onResolve = onResolve || identity;
+        onReject = onReject || thrower;
+
+        return new Promise((resolve, reject) => {
+            this._addReactionRecord(onResolve, onReject, resolve, reject);
+            // Invoke immediately if the Promise is already fulfilled.
+            // Could optimize by circumventing the queue in this case.
+            if (this._state !== PENDING) {
+                this._publishResult();
+            }
+        });
     }
 
     /**
@@ -89,7 +151,7 @@ class Promise {
  * @return {Promise}
  */
 Promise.resolve = function resolve(value) {
-    /** TODO Implement */
+    return isPromise(value) ? value : makePromiseInState(RESOLVED, value);
 };
 
 /**
@@ -99,7 +161,7 @@ Promise.resolve = function resolve(value) {
  * @return {Promise}
  */
 Promise.reject = function reject(reason) {
-    /** TODO Implement */
+    return makePromiseInState(REJECTED, reason);
 };
 
 /**
@@ -116,7 +178,35 @@ Promise.reject = function reject(reason) {
  * @return {Promise} - resolves with array corresponding to input promises
  */
 Promise.all = function all(iterable) {
-    /** TODO Implement */
+    return new Promise((resolve, reject) => {
+        const len = iterable.length;
+        const results = new Array(len);
+        let count = 0;
+
+        // Special case: no inputs
+        if (!len) {
+            return resolve(results);
+        }
+
+        const resolveOne = () => {
+            if (++count === len) {
+                resolve(results);
+            }
+        }
+
+        // NB: in a real library you'd want to implement this with Promise
+        // internals, *outside of* the executor, since the JIT deoptimizes
+        // code inside try-catch blocks.
+        iterable.forEach((input, i) => {
+            Promise.resolve(input)
+                .then(val => {
+                    results[i] = val;
+                    resolveOne();
+                }, reason => {
+                    reject(reason);
+                });
+        });
+    });
 };
 
 /**
@@ -128,7 +218,15 @@ Promise.all = function all(iterable) {
  * @return {Promise}
  */
 Promise.race = function race(iterable) {
-    /** TODO Implement */
+    return new Promise((resolve, reject) => {
+        const len = iterable.length;
+        if (!len) {
+            resolve();
+        }
+        iterable.forEach(input => {
+            Promise.resolve(input).then(resolve, reject);
+        });
+    });
 };
 
 
