@@ -489,27 +489,32 @@ describe('Promise', () => {
                 .all(P)
                 .then(v => done(`unexpected resolve: ${v}`))
                 .catch(reason => {
-                    chai.expect(catchCount).to.equal(1);
-                    chai.expect(reason).to.equal('bar');
-                    done();
+                    setTimeout(() => {
+                        chai.expect(catchCount).to.equal(2);
+                        chai.expect(reason).to.equal('bar');
+                        done();
+                    }, 15);
                 });
         });
         it('ignores subsequent resolved promises after one rejects', done => {
-            let didResolve = false;
+            let resolveCalled = false;
             let P = [
                 new Promise(resolve => setTimeout(() => {
-                    didResolve = true;
+                    resolveCalled = true;
                     resolve('foo');
                 }, 10)),
-                new Promise((resolve, reject) => setTimeout(reject, 5)),
+                new Promise((resolve, reject) => setTimeout(() => reject('bar'), 5)),
                 'baz'
             ];
             Promise
                 .all(P)
                 .then(v => done(`unexpected resolve: ${v}`))
-                .catch(() => {
-                    chai.expect(didResolve).to.equal(false);
-                    done();
+                .catch(reason => {
+                    setTimeout(() => {
+                        chai.expect(resolveCalled).to.equal(true);
+                        chai.expect(reason).to.equal('bar');
+                        done();
+                    }, 15);
                 });
         });
     });
@@ -572,14 +577,22 @@ describe('Promise', () => {
                     reject('bar')
                 }, 10))
             ]
-            Promise
-                .race(P)
-                .then(v => done(`unexpected resolve ${v}`))
+            let prom = Promise.race(P);
+
+            prom.then(v => done(`unexpected resolve ${v}`))
                 .catch(reason => {
                     chai.expect(count).to.equal(1);
                     chai.expect(reason).to.equal('foo');
-                    done();
                 });
+
+            setTimeout(() => {
+                prom.then(v => done(`unexpected resolve ${v}`))
+                    .catch(reason => {
+                        chai.expect(count).to.equal(2);
+                        chai.expect(reason).to.equal('foo');
+                        done();
+                    });
+            }, 15);
         });
         it('ignores subsequent resolves after one rejects', done => {
             let count = 0;
@@ -592,15 +605,25 @@ describe('Promise', () => {
                     count++;
                     resolve('bar')
                 }, 10))
-            ]
-            Promise
-                .race(P)
-                .then(v => done(`unexpected resolve ${v}`))
+            ];
+
+            let prom = Promise.race(P);
+
+            prom.then(v => done(`unexpected resolve ${v}`))
                 .catch(reason => {
                     chai.expect(count).to.equal(1);
                     chai.expect(reason).to.equal('foo');
-                    done();
                 });
+
+            setTimeout(() => {
+                prom
+                    .then(v => done(`unexpected resolve: ${v}`))
+                    .catch(reason => {
+                        chai.expect(count).to.equal(2);
+                        chai.expect(reason).to.equal('foo');
+                        done();
+                    });
+            }, 15);
         });
         it('ignores subsequent rejections after one resolves', done => {
             let count = 0;
@@ -613,15 +636,22 @@ describe('Promise', () => {
                     count++;
                     reject('bar')
                 }, 10))
-            ]
-            Promise
-                .race(P)
-                .then(v => {
+            ];
+
+            let p = Promise.race(P);
+
+            p.then(v => {
+                chai.expect(v).to.equal('foo');
+                chai.expect(count).to.equal(1);
+            }).catch(reason => done(`unexpected reject: ${reason}`));
+
+            setTimeout(() => {
+                p.then(v => {
                     chai.expect(v).to.equal('foo');
-                    chai.expect(count).to.equal(1);
+                    chai.expect(count).to.equal(2);
                     done();
-                })
-                .catch(reason => done(`unexpected reject: ${reason}`));
+                }).catch(r => done(`unexpected reject: ${r}`));
+            }, 15);
         });
         it('ignores subsequent resolves after one resolves', done => {
             let count = 0;
