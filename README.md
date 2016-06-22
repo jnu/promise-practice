@@ -104,4 +104,5 @@ things in `promise.js` to make the tests pass.
 Note: the `promise.js` template is written as an ES6 `class` for simplicity.
 
 ## Too long; didn't code?
-Checkout the `solution` branch to see a sample implementation.
+Checkout the `solution` branch to see a sample implementation, or `solution2`
+for a slightly different one.
