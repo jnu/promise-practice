@@ -17,10 +17,15 @@ Different implementations you might use are:
  - Bluebird
  - Q
  - Angular's $q (based on Q)
- - Promise polyfill
+ - es6-promise polyfill
 
 Of these, the last strives to adhere to the spec. The others have a variety of
 other features.
+
+### Angular's $q service
+When using Angular, _always use $q_. Don't use native `Promise` (or a polyfill).
+This is because $q is wired into the $digest cycle: it calls `$scope.$apply`
+for you when the promise resolves so your UI stays in sync.
 
 ## What problem do Promises solve?
 * Promises represent an eventual value.
@@ -28,8 +33,37 @@ other features.
 it were synchronous.
 * Promises get you out of callback hell
 
-## What does "asynchronous code written synchronously" look like?
+### What does "asynchronous code written synchronously" look like?
+Traditionally callbacks are passed as an argument to a function, and that
+function calls them when appropriate. With Promises, the continuation is instead
+given to the _return value_ of the function. Compare:
 
+Accepting a callback:
+```js
+function getAsyncVal(callback) {
+    setTimeout(() => callback('foo'), 200);
+}
+
+getAsyncVal(val => {
+    console.log(val)
+});
+```
+
+Returning a Promise:
+```js
+function getAsyncValPromise() {
+    return new Promise(resolve => {
+        setTimeout(() => resolve('foo'), 200);
+    });
+}
+
+getAsyncValPromise()
+    .then(val => {
+        console.log(val)
+    });
+```
+
+See `examples.js` for more side-by-side comparisons of callbacks and Promises.
 
 ## A Promising Future
 Promises are getting even more play in ES7 with `async` functions! Check out
@@ -67,7 +101,7 @@ $ npm install && npm start
 to start the test watcher. Then open your editor and implement all the
 things in `promise.js` to make the tests pass.
 
-ES6 code is
+Note: the `promise.js` template is written as an ES6 `class` for simplicity.
 
-## Stuck / too long; didn't code?
-I checked my solution into the `solution` branch.
+## Too long; didn't code?
+Checkout the `solution` branch to see a sample implementation.
