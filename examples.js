@@ -31,6 +31,20 @@ getAsyncValPromise()
 // Promise encapsulates the 'asyncness'
 // But so far this isn't truly better than callbacks.
 ////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 // More complicated async #1: chaining
 // With Callbacks:
 
@@ -54,7 +68,8 @@ getAsyncVal(val => {
     });
 });
 
-// Now entering Callback Hell! Imagine adding a third, and a fourth, etc...
+// This is Callback Hell! Imagine adding a third, and a fourth, etc...
+
 ////////////////////////////////////////////////////////////////////////////////
 // More complicated async #1: chaining
 // With Promises:
@@ -83,6 +98,32 @@ getAsyncValPromise()
     });
 
 // Oh hey, all your JS suddenly fits in 80chars!
+// Takeaway: promises are chainable. The `#then` predicate can return a Promise
+// value. If it returns a non-promise, the value is wrapped as one.
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // More complicated async #2: multiple async and races
 // With Callbacks:
@@ -114,6 +155,7 @@ getAsync1(val => storeValue(0, val));
 getAsync2(val => storeValue(1, val));
 
 // Messy use of scope, have to hard-code how many calls before `done`
+
 ////////////////////////////////////////////////////////////////////////////////
 // More complicated async #2: multiple async and races
 // With Promises:
@@ -137,6 +179,26 @@ Promise.all([
     .then(vals => {
         console.log('done! values', vals);
     });
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Real world async: Idempotency
@@ -166,6 +228,7 @@ foo.loadBar(bar => console.log(bar));
 foo.loadBar(bar => console.log(bar));
 
 // Lot of boilerplate, bug-prone (note the setTimeout in the cached path)
+
 ////////////////////////////////////////////////////////////////////////////////
 // Real world async: Idempotency
 // With Promises
@@ -175,7 +238,6 @@ function getJSON(url) {
 }
 
 class Foo {
-
     loadBar() {
         this._barPromise = this._barPromise || getJSON('/bar');
         return this._barPromise;
@@ -188,6 +250,26 @@ foo.loadBar().then(bar => console.log(bar));
 
 // The *whole promise* is cached and reused! It can be re-thened!
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Real world async: Error handling
 
@@ -196,7 +278,7 @@ foo.loadBar().then(bar => console.log(bar));
 
 
 
-
+////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // Promising future: async functions in ES7!
 
