@@ -1,5 +1,7 @@
 /**
  * Why use Promises?
+ *
+ * Note: Copy + paste into Chrome console to test out snippets.
  */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -48,16 +50,14 @@ getAsyncValPromise()
 // More complicated async #1: chaining
 // With Callbacks:
 
-function getAsyncValPromise() {
-    return new Promise(resolve => {
-        setTimeout(() => resolve('foo'), 200);
-    });
+function getAsyncVal(callback) {
+    setTimeout(() => callback('foo'), 200);
 }
 
 function processAsyncVal(val, callback) {
     setTimeout(() => {
         callback(val.toUpperCase());
-    }, 2);
+    }, 200);
 }
 
 getAsyncVal(val => {
@@ -200,24 +200,52 @@ Promise.all([
 
 
 
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Real world async: Idempotency
 // With callbacks
 
 function getJSON(url, callback) {
-    setTimeout(() => callback({ url: 'something interesting' }), 50);
+    console.log('fetching remote json');
+    setTimeout(() => callback(null, { url: 'something interesting' }), 50);
 }
 
 class Foo {
 
+    constructor() {
+        this._callbackQueue = [];
+        this._loading = false;
+        this._loaded = false;
+        this._val = undefined;
+    }
+
     loadBar(callback) {
-        if (this._bar) {
-            setTimeout(() => callback(this._bar), 0);
-        } else {
-            getJSON('/bar', val => {
-                this._bar = val;
-                callback(this._bar);
+        this._callbackQueue.push(callback);
+        if (this._loaded) {
+            setTimeout(() => this._executeCallbacks(), 0);
+        } else if (!this._loading) {
+            this._loading = true;
+            getJSON('/bar', (err, val) => {
+                this._loading = false;
+                if (!err) {
+                    this._loaded = true;
+                    // TODO handle errors???
+                }
+                this._val = val;
+                this._executeCallbacks();
             });
+        }
+    }
+
+    _executeCallbacks() {
+        const queue = this._callbackQueue;
+        const val = this._val;
+        let cb;
+        while (cb = queue.shift()) {
+            cb(val);
         }
     }
 
@@ -227,13 +255,14 @@ let foo = new Foo();
 foo.loadBar(bar => console.log(bar));
 foo.loadBar(bar => console.log(bar));
 
-// Lot of boilerplate, bug-prone (note the setTimeout in the cached path)
+// Lot of boilerplate, bug-prone
 
 ////////////////////////////////////////////////////////////////////////////////
 // Real world async: Idempotency
 // With Promises
 
 function getJSON(url) {
+    console.log('fetching remote json');
     return Promise.resolve({ url: 'something interesting' });
 }
 
@@ -248,7 +277,10 @@ let foo = new Foo();
 foo.loadBar().then(bar => console.log(bar));
 foo.loadBar().then(bar => console.log(bar));
 
-// The *whole promise* is cached and reused! It can be re-thened!
+// Oh hey, that whole Callback implementation above is exactly a Promise
+// (Or at least half of one, with no way of handling errors!)
+
+
 
 
 
@@ -271,7 +303,132 @@ foo.loadBar().then(bar => console.log(bar));
 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Real world async: Error handling
+/// Real world: Error handling
+/// With Callbacks
+
+function probabug() {
+    if (Math.random() >= 0.5) {
+        throw new Error('uh oh');
+    }
+}
+
+function flakySystem() {
+    return Math.random() >= 0.5;
+}
+
+function getAsyncVal(callback) {
+    probabug();
+    setTimeout(() => {
+        let err = flakySystem() && new Error('network error');
+        callback(err, 'foo');
+    }, 200);
+}
+
+function processAsyncVal(val, callback) {
+    probabug();
+    setTimeout(() => {
+        let err = flakySystem() && new Error('processing error');
+        callback(err, val.toUpperCase());
+    }, 200);
+}
+
+
+
+try {
+    getAsyncVal((err, val) => {
+        if (err) {
+            console.error('Request error:', err);
+            val = 'recovery value';
+        }
+        console.log('value:', val);
+
+        try {
+            processAsyncVal(val, (err2, newVal) => {
+                if (err2) {
+                    console.error('Processing error:', err2);
+                    newVal = 'another recovery value';
+                }
+                console.log('processed:', newVal);
+            });
+        } catch (err2) {
+            console.error('Processing execution error', err2);
+        }
+    });
+} catch (err) {
+    console.error('Request execution error:', err);
+}
+
+// Yikes.
+// Note: can't recover from try...catch errors without even more code.
+
+////////////////////////////////////////////////////////////////////////////////
+// Real World: Error Handling
+// With Promises
+
+function probabug() {
+    if (Math.random() >= 0.5) {
+        throw new Error('uh oh');
+    }
+}
+
+function flakySystem() {
+    return Math.random() >= 0.5;
+}
+
+function getAsyncValPromise() {
+    return new Promise((resolve, reject) => {
+        probabug();
+        setTimeout(() => {
+            if (flakySystem()) {
+                reject(new Error('network error'));
+            } else {
+                resolve('foo');
+            }
+        }, 200);
+    });
+}
+
+function processAsyncValPromise(val) {
+    return new Promise((resolve, reject) => {
+        probabug();
+        setTimeout(() => {
+            if (flakySystem()) {
+                reject(new Error('processing error'));
+            } else {
+                resolve(val.toUpperCase());
+            }
+        }, 200);
+    });
+}
+
+getAsyncValPromise()
+    .then(val => {
+        console.log('value:', val);
+        return val;
+    })
+    .catch(err => {
+        console.error('Error getting value:', err);
+        return 'recovery value';
+    })
+    .then(processAsyncValPromise)
+    .catch(err => {
+        console.error('Error processing value:', err);
+        return 'another splendid recovery'
+    })
+    .then(val => {
+        console.log('processed:', val);
+        return val;
+    })
+    .catch(err => {
+        console.error('Another Error occurred:', err);
+        // Could rethrow, or provide another recovery value.
+    });
+
+
+
+
+
+
 
 
 
@@ -283,7 +440,7 @@ foo.loadBar().then(bar => console.log(bar));
 // Promising future: async functions in ES7!
 
 function getJSON(url) {
-    return Promise.resolve({ /* json from server */});
+    return Promise.resolve({ /* json from server */ });
 }
 
 async function loadPage() {
